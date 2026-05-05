@@ -44,5 +44,29 @@ def init_db():
     )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fact_player_tracks (
+            track_row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER,
+            frame_number INTEGER,
+            track_id INTEGER,
+            x1 INTEGER,
+            y1 INTEGER,
+            x2 INTEGER,
+            y2 INTEGER,
+            confidence REAL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+
+    cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dim_track_player_map (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_id INTEGER,
+                track_id INTEGER,
+                player_id INTEGER
+            )
+            """)
     conn.commit()
     conn.close()

@@ -4,7 +4,8 @@ import pandas as pd
 import time
 from src.stats import calculate_player_stats
 from src.report import generate_player_report
-
+import os
+from src.tracking import track_players_and_save
 # Initialize DB
 init_db()
 
@@ -40,10 +41,20 @@ col_video, col_controls = st.columns([2, 1])
 with col_video:
     st.subheader("Video")
 
-    video_file = st.file_uploader("Upload Match Video", type=["mp4", "mov", "avi"])
+video_file = st.file_uploader("Upload Match Video", type=["mp4", "mov", "avi"])
 
-    if video_file:
-        st.video(video_file)
+video_path = None
+
+if video_file:
+    os.makedirs("videos", exist_ok=True)
+
+    video_path = f"videos/{video_file.name}"
+
+    with open(video_path, "wb") as f:
+        f.write(video_file.getbuffer())
+
+    st.video(video_path)
+    st.success(f"Video saved: {video_path}")
 
 # -------------------------
 # RIGHT → CONTROLS
@@ -64,6 +75,12 @@ with col_controls:
             players["player_id"],
             format_func=lambda x: players[players.player_id==x]["name"].values[0]
         )
+    if video_path:
+        if st.button("🚀 Analyze Video (Tracking)"):
+            with st.spinner("Running tracking... this may take time"):
+                track_players_and_save(video_path, match_id=selected_match)
+
+        st.success("Tracking completed!")
 
         # TIMER
         st.markdown("### ⏱️ Timer")
@@ -255,3 +272,68 @@ if not players.empty:
         )
 
         st.success(f"Report generated: {output_path}")
+
+# =========================
+# 🎯 TRACK → PLAYER MAPPING
+# =========================
+st.header("🎯 Map Tracks to Players")
+
+conn = get_connection()
+
+tracks_df = pd.read_sql("""
+SELECT DISTINCT track_id
+FROM fact_player_tracks
+""", conn)
+
+players_df = pd.read_sql("SELECT * FROM dim_players", conn)
+
+conn.close()
+
+if not tracks_df.empty:
+
+    for track_id in tracks_df["track_id"]:
+
+        col1, col2 = st.columns([1,2])
+
+        with col1:
+            st.write(f"Track ID: {track_id}")
+
+        with col2:
+            selected_player = st.selectbox(
+                f"Assign Player to Track {track_id}",
+                players_df["player_id"],
+                key=f"track_{track_id}",
+                format_func=lambda x: players_df[players_df.player_id==x]["name"].values[0]
+            )
+
+            if st.button(f"Save Mapping {track_id}"):
+                conn = get_connection()
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                INSERT INTO dim_track_player_map (match_id, track_id, player_id)
+                VALUES (?, ?, ?)
+                """, (1, track_id, selected_player))
+
+                conn.commit()
+                conn.close()
+
+                st.success(f"Track {track_id} mapped!")
+
+st.header("🧹 Reset Database")
+
+if st.button("⚠️ Reset All Data"):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM fact_events")
+    cursor.execute("DELETE FROM fact_player_tracks")
+    cursor.execute("DELETE FROM dim_track_player_map")
+    cursor.execute("DELETE FROM dim_players")
+    cursor.execute("DELETE FROM dim_matches")
+
+    conn.commit()
+    conn.close()
+
+    st.success("Database cleared!")
+    st.rerun()

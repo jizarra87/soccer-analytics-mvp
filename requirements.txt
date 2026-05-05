@@ -3,3 +3,5 @@ pandas
 plotly
 reportlab
 yt-dlp
+ultralytics 
+opencv-python
