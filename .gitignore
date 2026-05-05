@@ -6,3 +6,4 @@ data/
 .env
 .vscode/
 *.mp4
+videos/
