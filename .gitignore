@@ -5,5 +5,4 @@ data/
 *.db
 .env
 .vscode/
-*.mp4
-videos/
+videos/*.mp4
